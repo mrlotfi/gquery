@@ -1,0 +1,22 @@
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 16
+panic = 'abort'
+
+[package]
+name = "georust"
+version = "0.1.0"
+authors = ["Mohammad Reza Lotfi <mrlotfi@cafebazaar.ir>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+geojson = { version= "0.19.0", features=["geo-types"]}
+geo = { version = "0.14.1", features=["use-serde"]}
+tokio = { version = "*", features=["macros"]}
+serde = { version = "*", features=["derive"]}
+geo-types = "*"
+warp = "0.2"
+nanoid = "0.3.0"
