@@ -1,4 +1,5 @@
 mod server;
+mod collection;
 
 #[tokio::main]
 async fn main() {
