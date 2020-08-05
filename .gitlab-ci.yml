@@ -1,0 +1,14 @@
+stages:
+  - build
+
+
+build:
+  image: docker:stable-dind
+  stage: build
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+  script:
+    - docker build -t mrlotfi/gquery:latest .
+    - docker push mrlotfi/gquery:latest
