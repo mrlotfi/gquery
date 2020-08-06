@@ -1,11 +1,10 @@
 [profile.release]
 lto = true
 opt-level = 3
-codegen-units = 16
 panic = 'abort'
 
 [package]
-name = "georust"
+name = "gquery"
 version = "0.1.0"
 authors = ["Mohammad Reza Lotfi <mrlotfi@cafebazaar.ir>"]
 edition = "2018"

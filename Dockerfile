@@ -1,11 +1,10 @@
 FROM rust:alpine AS builder
 
 RUN apk add  musl-dev
-WORKDIR /usr/src/gquery
+WORKDIR /src/gquery
 COPY . .
-RUN cargo install --path .
-RUN ls
+RUN cargo build --release
 
 FROM scratch
-COPY --from=builder /usr/local/cargo/bin/gquery /usr/local/bin/gquery
+COPY --from=builder /src/gquery/target/release/gquery /usr/bin/gquery
 CMD ["gquery"]
