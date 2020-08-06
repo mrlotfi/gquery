@@ -1,6 +1,6 @@
 FROM rust:alpine AS builder
 
-RUN apk add  musl-dev
+RUN apk add musl-dev make
 WORKDIR /src/gquery
 COPY . .
 RUN cargo build --release

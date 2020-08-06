@@ -370,6 +370,7 @@ dependencies = [
  "geojson",
  "nanoid",
  "serde",
+ "serde_json",
  "spade",
  "tokio",
  "warp",
