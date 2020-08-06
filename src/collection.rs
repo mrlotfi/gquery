@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
 use std::time::Instant;
+use crate::config::get_conf;
+use std::error::Error;
 
 
 struct IndexItem {
@@ -69,6 +71,7 @@ impl Storage {
     }
 
     pub fn save_to_file(&self) {
+        let file_path = get_conf().data;
         let mut saved = Saved {
             items: HashMap::new()
         };
@@ -78,24 +81,25 @@ impl Storage {
                 saved.items.get_mut(col).unwrap().insert(key.clone(), geojson_str.clone());
             }
         }
-        serde_json::to_writer(&File::create("data.json").unwrap(), &saved).unwrap();
+        serde_json::to_writer(&File::create(file_path).unwrap(), &saved).unwrap();
     }
 
-    pub fn load_from_file() -> Self {
+    pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
+        let file_path = get_conf().data;
         let start = Instant::now();
         let mut s = Self::new();
-        let saved: Saved = serde_json::from_reader(BufReader::new(File::open("data.json").unwrap())).unwrap();
+        let saved: Saved = serde_json::from_reader(BufReader::new(File::open(file_path)?))?;
         let mut n: usize = 0;
         for (col, val) in saved.items {
             let mut collection = Collection::new();
             for (id, geojson_str) in val {
-                collection.add(id, GeoJson::from_str(&geojson_str).unwrap());
+                collection.add(id, GeoJson::from_str(&geojson_str)?);
             }
             n += collection.objects.len();
             s.collections.insert(col, Arc::new(RwLock::new(collection)));
         }
         println!("Loaded {} items from saved db in {:.2} seconds", n, start.elapsed().as_secs_f32());
-        s
+        Ok(s)
     }
 
     pub fn get(&self, key: &String) -> Option<Arc<RwLock<Collection>>> {

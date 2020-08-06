@@ -3,6 +3,8 @@ use serde::{Serialize, Deserialize};
 use geojson::GeoJson;
 use nanoid;
 use crate::collection::Storage;
+use crate::config::{get_conf, WELCOME_MESSAGE};
+use colored::*;
 use std::sync::Arc;
 use std::sync::RwLock;
 use warp::http::Response;
@@ -20,9 +22,16 @@ struct SearchPoint {
 }
 
 pub async fn serve() {
-    let network = [0, 0, 0, 0];
-    let port = 6985;
-    let s = Storage::load_from_file();
+    println!("{}", WELCOME_MESSAGE);
+    let s = match Storage::load_from_file() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{}",
+                format!("Unable to load data file: {}. Creating an empty server", e.to_string()).yellow()
+            );
+            Storage::new()
+        }
+    };
     let storage = Arc::new(RwLock::new(s));
     let storage1 = Arc::clone(&storage);
     let storage2 = Arc::clone(&storage);
@@ -77,6 +86,7 @@ warp::put()
                 .body(format!("OK"))
         })
     );
-    println!("Server running on port {}", port);
-    warp::serve(routes).run((network, port)).await
+    let (host, port) = (get_conf().host, get_conf().port);
+    println!("{}", format!("Server running on {}:{}", host.to_string(), port).green());
+    warp::serve(routes).run((host, port)).await
 }
