@@ -6,8 +6,21 @@ use crate::collection::Storage;
 use crate::config::{get_conf, WELCOME_MESSAGE};
 use colored::*;
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use warp::http::Response;
+use tokio::time::{interval, Duration};
+
+fn backup(storage: Arc<RwLock<Storage>>) -> tokio::task::JoinHandle<()> {
+    return tokio::spawn(async move {
+        let mut interval = interval(Duration::from_secs(get_conf().save_interval));
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            storage.read().save_to_file();
+        }
+    });
+}
+
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct IndexRequestItem {
@@ -36,6 +49,7 @@ pub async fn serve() {
     let storage1 = Arc::clone(&storage);
     let storage2 = Arc::clone(&storage);
     let storage3 = Arc::clone(&storage);
+    backup(Arc::clone(&storage));
     let routes = warp::any()
         .and(warp::path::param::<String>())
         .and(warp::body::content_length_limit(4196 * 16))
@@ -45,12 +59,12 @@ pub async fn serve() {
                 Some(res) => res,
                 None => nanoid::nanoid!(),
             };
-            let col = storage1.read().unwrap().get(&collection);
+            let col = storage1.read().get(&collection);
             if let Some(col) = col {
-                col.write().unwrap().add(id.clone(), body.geojson);
+                col.write().add(id.clone(), body.geojson);
             } else {
-                storage1.write().unwrap().create(collection)
-                    .write().unwrap().add(id.clone(), body.geojson);
+                storage1.write().create(collection)
+                    .write().add(id.clone(), body.geojson);
             }
 
             return id;
@@ -61,10 +75,10 @@ pub async fn serve() {
             .and(warp::path("nearby"))
             .and(warp::query::<SearchPoint>())
             .map(move |collection: String, s: SearchPoint| {
-                let col = storage2.read().unwrap().get(&collection);
+                let col = storage2.read().get(&collection);
                 let mut n = None;
                 if let Some(col) = col {
-                    n = col.read().unwrap().nearest(s.long, s.lat);
+                    n = col.read().nearest(s.long, s.lat);
                 }
                 if let Some(n) = n {
                     Response::builder()
@@ -80,7 +94,7 @@ pub async fn serve() {
 warp::put()
         .and(warp::path("save"))
         .map(move || {
-            storage3.read().unwrap().save_to_file();
+            storage3.read().save_to_file();
             Response::builder()
                 .status(200)
                 .body(format!("OK"))

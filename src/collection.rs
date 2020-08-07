@@ -6,7 +6,8 @@ use serde::{Serialize, Deserialize};
 use geo::prelude::*;
 use geo::algorithm::bounding_rect::BoundingRect as br;
 use geojson::{GeoJson, quick_collection};
-use std::sync::{RwLock, Arc};
+use std::sync::Arc;
+use parking_lot::RwLock;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -71,24 +72,29 @@ impl Storage {
     }
 
     pub fn save_to_file(&self) {
+        let start = Instant::now();
         let file_path = get_conf().data;
         let mut saved = Saved {
             items: HashMap::new()
         };
+        let mut n: usize = 0;
         for (col, val) in &self.collections {
             saved.items.insert(col.clone(), HashMap::new());
-            for (key, geojson_str) in &val.read().unwrap().objects {
+            for (key, geojson_str) in &val.read().objects {
                 saved.items.get_mut(col).unwrap().insert(key.clone(), geojson_str.clone());
+                n += 1;
             }
         }
-        serde_json::to_writer(&File::create(file_path).unwrap(), &saved).unwrap();
+        bincode::serialize_into(&File::create(file_path).unwrap(), &saved).unwrap();
+        println!("Saved {} items from current db in {:.2} seconds", n, start.elapsed().as_secs_f32());
     }
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
         let file_path = get_conf().data;
         let start = Instant::now();
         let mut s = Self::new();
-        let saved: Saved = serde_json::from_reader(BufReader::new(File::open(file_path)?))?;
+        // let saved: Saved = serde_json::from_reader(BufReader::new(File::open(file_path)?))?;
+        let saved: Saved = bincode::deserialize_from(BufReader::new(File::open(file_path)?))?;
         let mut n: usize = 0;
         for (col, val) in saved.items {
             let mut collection = Collection::new();

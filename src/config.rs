@@ -18,11 +18,11 @@ pub struct Config {
     #[structopt(short, long, default_value="127.0.0.1", parse(try_from_str))]
     pub host: IpAddr,
 
-    #[structopt(short, long, default_value="./data.json", parse(from_os_str))]
+    #[structopt(short, long, default_value="./data.bin", parse(from_os_str))]
     pub data: PathBuf,
 
-    #[structopt(short, long, parse(from_occurrences))]
-    verbose: u8,
+    #[structopt(short, long, name="interval between saved snapshots in seconds", default_value="60")]
+    pub save_interval: u64,
 }
 
 pub fn get_conf() -> Config {
