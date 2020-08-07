@@ -7,4 +7,4 @@ RUN cargo build --release
 
 FROM scratch
 COPY --from=builder /src/gquery/target/release/gquery /usr/bin/gquery
-CMD ["gquery"]
+ENTRYPOINT ["/usr/bin/gquery"]
