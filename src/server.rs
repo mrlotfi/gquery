@@ -49,9 +49,12 @@ pub async fn serve() {
     let storage1 = Arc::clone(&storage);
     let storage2 = Arc::clone(&storage);
     let storage3 = Arc::clone(&storage);
+    let storage4 = Arc::clone(&storage);
+    let storage5 = Arc::clone(&storage);
     backup(Arc::clone(&storage));
     let routes = warp::any()
         .and(warp::path::param::<String>())
+        .and(warp::path::end())
         .and(warp::body::content_length_limit(4196 * 16))
         .and(warp::body::json())
         .map(move |collection: String, body: IndexRequestItem| {
@@ -91,6 +94,27 @@ pub async fn serve() {
                 }
             })
     ).or(
+        warp::get()
+            .and(warp::path::param::<String>())
+            .and(warp::path("intersect"))
+            .and(warp::query::<SearchPoint>())
+            .map(move |collection: String, s: SearchPoint| {
+                let col = storage5.read().get(&collection);
+                let mut n = None;
+                if let Some(col) = col {
+                    n = col.read().intersect(s.long, s.lat);
+                }
+                if let Some(n) = n {
+                    Response::builder()
+                        .header("Content-Type", "application/json")
+                        .body(format!("{{\"id\": \"{}\", \"geojson\": {}}}", n.0, n.1))
+                } else {
+                    Response::builder()
+                        .status(404)
+                        .body(format!("not found"))
+                }
+            })
+    ).or(
 warp::put()
         .and(warp::path("save"))
         .map(move || {
@@ -99,6 +123,26 @@ warp::put()
                 .status(200)
                 .body(format!("OK"))
         })
+    ).or(
+        warp::get()
+            .and(warp::path::param::<String>())
+            .and(warp::path::param::<String>())
+            .map(move |collection: String, id: String| {
+                let col = storage4.read().get(&collection);
+                let mut n = None;
+                if let Some(col) = col {
+                    n = col.read().get(&id);
+                }
+                if let Some(n) = n {
+                    Response::builder()
+                        .header("Content-Type", "application/json")
+                        .body(format!("{{\"id\": \"{}\", \"geojson\": {}}}", id, n))
+                } else {
+                    Response::builder()
+                        .status(404)
+                        .body(format!("not found"))
+                }
+            })
     );
     let (host, port) = (get_conf().host, get_conf().port);
     println!("{}", format!("Server running on {}:{}", host.to_string(), port).green());

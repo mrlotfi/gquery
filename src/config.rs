@@ -21,7 +21,7 @@ pub struct Config {
     #[structopt(short, long, default_value="./data.bin", parse(from_os_str))]
     pub data: PathBuf,
 
-    #[structopt(short, long, name="interval between saved snapshots in seconds", default_value="60")]
+    #[structopt(short, long, name="interval between saved snapshots in seconds", default_value="3600")]
     pub save_interval: u64,
 }
 

@@ -134,6 +134,10 @@ impl Collection {
         }
     }
 
+    pub fn get(&self, key: &String) -> Option<String> {
+        self.objects.get(key).map(|s| s.clone())
+    }
+
     pub fn add(&mut self, id: String, geojson: GeoJson) -> bool {
         let collection: GeometryCollection<f64> = quick_collection(&geojson).unwrap();
         collection.into_iter().for_each(|geom| {
@@ -163,7 +167,6 @@ impl Collection {
             }
         });
         self.objects.insert(id, geojson.to_string());
-        self.nearest(2., 2.);
         true
     }
 
@@ -182,6 +185,16 @@ impl Collection {
             .map(|n| {
                 (n.id.clone(), self.objects.get(&n.id).unwrap().clone())
             });
+    }
+
+    pub fn intersect(&self, long: f64, lat: f64) -> Option<(String, String)> {
+        let nearest = self.idx.nearest_neighbor(&[long, lat]);
+        if let Some(n) = nearest {
+            if n.distance2(&[long, lat]) < 0.0000001 {
+                return Some((n.id.clone(), self.objects.get(&n.id).unwrap().clone()));
+            }
+        }
+        None
     }
 }
 
