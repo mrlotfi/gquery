@@ -93,7 +93,6 @@ impl Storage {
         let file_path = get_conf().data;
         let start = Instant::now();
         let mut s = Self::new();
-        // let saved: Saved = serde_json::from_reader(BufReader::new(File::open(file_path)?))?;
         let saved: Saved = bincode::deserialize_from(BufReader::new(File::open(file_path)?))?;
         let mut n: usize = 0;
         for (col, val) in saved.items {
@@ -117,6 +116,14 @@ impl Storage {
     pub fn create(&mut self, key: String) -> Arc<RwLock<Collection>> {
         self.collections.insert(key.clone(), Arc::new(RwLock::new(Collection::new())));
         return Arc::clone(&self.collections[&key]);
+    }
+
+    pub fn remove(&mut self, key: String) {
+        self.collections.remove(&key);
+    }
+
+    pub fn list(&self) -> Vec<&String> {
+        self.collections.keys().into_iter().collect()
     }
 }
 
