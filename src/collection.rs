@@ -93,7 +93,6 @@ impl Storage {
         let file_path = get_conf().data;
         let start = Instant::now();
         let mut s = Self::new();
-        // let saved: Saved = serde_json::from_reader(BufReader::new(File::open(file_path)?))?;
         let saved: Saved = bincode::deserialize_from(BufReader::new(File::open(file_path)?))?;
         let mut n: usize = 0;
         for (col, val) in saved.items {
@@ -119,7 +118,7 @@ impl Storage {
         return Arc::clone(&self.collections[&key]);
     }
 
-    pub fn drop(&mut self, key: String) {
+    pub fn remove(&mut self, key: String) {
         self.collections.remove(&key);
     }
 

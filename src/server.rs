@@ -21,6 +21,8 @@ fn backup(storage: Arc<RwLock<Storage>>) -> tokio::task::JoinHandle<()> {
     });
 }
 
+type DB = Arc<RwLock<Storage>>;
+
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct IndexRequestItem {
@@ -34,56 +36,56 @@ struct SearchPoint {
     lat: f64
 }
 
-fn add_geojson() -> warp::filters::BoxedFilter<(String, IndexRequestItem,)> {
-    warp::post()
-        .and(warp::path::param::<String>())
-        .and(warp::path::end())
-        .and(warp::body::content_length_limit(4196 * 16))
-        .and(warp::body::json())
-        .boxed()
-}
+mod routes {
+    use super::*;
+    use warp::Filter;
 
-pub async fn serve() {
-    println!("{}", WELCOME_MESSAGE);
-    let s = match Storage::load_from_file() {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("{}",
-                format!("Unable to load data file: {}. Creating an empty server", e.to_string()).yellow()
-            );
-            Storage::new()
-        }
-    };
-    let storage = Arc::new(RwLock::new(s));
-    let storage1 = Arc::clone(&storage);
-    let storage2 = Arc::clone(&storage);
-    let storage3 = Arc::clone(&storage);
-    let storage4 = Arc::clone(&storage);
-    let storage5 = Arc::clone(&storage);
-    backup(Arc::clone(&storage));
-    let routes = add_geojson()
-        .map(move |collection: String, body: IndexRequestItem| {
-            let id = match body.id {
-                Some(res) => res,
-                None => nanoid::nanoid!(),
-            };
-            let col = storage1.read().get(&collection);
-            if let Some(col) = col {
-                col.write().add(id.clone(), body.geojson);
-            } else {
-                storage1.write().create(collection)
-                    .write().add(id.clone(), body.geojson);
-            }
+    fn with_storage(s: DB) -> impl Filter<Extract = (DB,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || Arc::clone(&s))
+    }
 
-            return id;
-        });
-    let routes = warp::post().and(routes).or(
-    warp::get()
+    pub fn all(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        add_geojson(storage.clone())
+            .or(nearby(storage.clone()))
+            .or(intersect(storage.clone()))
+            .or(save(storage.clone()))
+            .or(get_by_key(storage.clone()))
+            .or(list(storage.clone()))
+            .or(drop(storage))
+    }
+
+    pub fn add_geojson(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::post()
+            .and(with_storage(storage))
+            .and(warp::path::param::<String>())
+            .and(warp::path::end())
+            .and(warp::body::content_length_limit(4196 * 16))
+            .and(warp::body::json())
+            .map(|storage: DB, collection: String, body: IndexRequestItem| {
+                let id = match body.id {
+                    Some(res) => res,
+                    None => nanoid::nanoid!(),
+                };
+                let col = storage.read().get(&collection);
+                if let Some(col) = col {
+                    col.write().add(id.clone(), body.geojson);
+                } else {
+                    storage.write().create(collection)
+                        .write().add(id.clone(), body.geojson);
+                }
+
+                return id;
+            })
+    }
+
+    pub fn nearby(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::get()
+            .and(with_storage(storage))
             .and(warp::path::param::<String>())
             .and(warp::path("nearby"))
             .and(warp::query::<SearchPoint>())
-            .map(move |collection: String, s: SearchPoint| {
-                let col = storage2.read().get(&collection);
+            .map(|storage: DB, collection: String, s: SearchPoint| {
+                let col = storage.read().get(&collection);
                 let mut n = None;
                 if let Some(col) = col {
                     n = col.read().nearest(s.long, s.lat);
@@ -98,13 +100,16 @@ pub async fn serve() {
                         .body(format!("not found"))
                 }
             })
-    ).or(
+    }
+
+    pub fn intersect(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::get()
+            .and(with_storage(storage))
             .and(warp::path::param::<String>())
             .and(warp::path("intersect"))
             .and(warp::query::<SearchPoint>())
-            .map(move |collection: String, s: SearchPoint| {
-                let col = storage5.read().get(&collection);
+            .map(|storage: DB, collection: String, s: SearchPoint| {
+                let col = storage.read().get(&collection);
                 let mut n = None;
                 if let Some(col) = col {
                     n = col.read().intersect(s.long, s.lat);
@@ -119,21 +124,27 @@ pub async fn serve() {
                         .body(format!("not found"))
                 }
             })
-    ).or(
-warp::put()
-        .and(warp::path("save"))
-        .map(move || {
-            storage3.read().save_to_file();
-            Response::builder()
-                .status(200)
-                .body(format!("OK"))
-        })
-    ).or(
+    }
+
+    pub fn save(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::put()
+            .and(with_storage(storage))
+            .and(warp::path("save"))
+            .map(|storage: DB| {
+                storage.read().save_to_file();
+                Response::builder()
+                    .status(200)
+                    .body(format!("OK"))
+            })
+    }
+
+    pub fn get_by_key(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::get()
+            .and(with_storage(storage))
             .and(warp::path::param::<String>())
             .and(warp::path::param::<String>())
-            .map(move |collection: String, id: String| {
-                let col = storage4.read().get(&collection);
+            .map(|storage: DB, collection: String, id: String| {
+                let col = storage.read().get(&collection);
                 let mut n = None;
                 if let Some(col) = col {
                     n = col.read().get(&id);
@@ -148,8 +159,41 @@ warp::put()
                         .body(format!("not found"))
                 }
             })
-    );
+    }
+
+    pub fn list(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::get()
+            .and(with_storage(storage))
+            .map(|storage: DB| {
+                warp::reply::json(&storage.read().list())
+            })
+    }
+
+    pub fn drop(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::delete()
+            .and(with_storage(storage))
+            .and(warp::path::param::<String>())
+            .map(|storage: DB, collection: String| {
+                storage.write().remove(collection);
+                "OK"
+            })
+    }
+}
+
+pub async fn serve() {
+    println!("{}", WELCOME_MESSAGE);
+    let s = match Storage::load_from_file() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("{}",
+                format!("Unable to load data file: {}. Creating an empty server", e.to_string()).yellow()
+            );
+            Storage::new()
+        }
+    };
+    let storage = Arc::new(RwLock::new(s));
+    backup(Arc::clone(&storage));
     let (host, port) = (get_conf().host, get_conf().port);
     println!("{}", format!("Server running on {}:{}", host.to_string(), port).green());
-    warp::serve(routes).run((host, port)).await
+    warp::serve(routes::all(storage)).run((host, port)).await
 }
