@@ -8,7 +8,7 @@ build:
   services:
     - docker:dind
   before_script:
-    - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+    - echo $HUB_PASSWORD | docker login -u $HUB_USERNAME --password-stdin
   script:
     - docker build -t mrlotfi/gquery:latest .
     - docker push mrlotfi/gquery:latest
