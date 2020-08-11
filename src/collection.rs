@@ -118,6 +118,14 @@ impl Storage {
         self.collections.insert(key.clone(), Arc::new(RwLock::new(Collection::new())));
         return Arc::clone(&self.collections[&key]);
     }
+
+    pub fn drop(&mut self, key: String) {
+        self.collections.remove(&key);
+    }
+
+    pub fn list(&self) -> Vec<&String> {
+        self.collections.keys().into_iter().collect()
+    }
 }
 
 

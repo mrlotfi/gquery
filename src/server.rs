@@ -34,6 +34,15 @@ struct SearchPoint {
     lat: f64
 }
 
+fn add_geojson() -> warp::filters::BoxedFilter<(String, IndexRequestItem,)> {
+    warp::post()
+        .and(warp::path::param::<String>())
+        .and(warp::path::end())
+        .and(warp::body::content_length_limit(4196 * 16))
+        .and(warp::body::json())
+        .boxed()
+}
+
 pub async fn serve() {
     println!("{}", WELCOME_MESSAGE);
     let s = match Storage::load_from_file() {
@@ -52,11 +61,7 @@ pub async fn serve() {
     let storage4 = Arc::clone(&storage);
     let storage5 = Arc::clone(&storage);
     backup(Arc::clone(&storage));
-    let routes = warp::any()
-        .and(warp::path::param::<String>())
-        .and(warp::path::end())
-        .and(warp::body::content_length_limit(4196 * 16))
-        .and(warp::body::json())
+    let routes = add_geojson()
         .map(move |collection: String, body: IndexRequestItem| {
             let id = match body.id {
                 Some(res) => res,
