@@ -1,4 +1,3 @@
-use warp::Filter;
 use serde::{Serialize, Deserialize};
 use geojson::GeoJson;
 use nanoid;
@@ -51,7 +50,8 @@ mod routes {
             .or(save(storage.clone()))
             .or(get_by_key(storage.clone()))
             .or(list(storage.clone()))
-            .or(drop(storage))
+            .or(drop(storage.clone()))
+            .or(remove_by_id(storage))
     }
 
     pub fn add_geojson(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -143,6 +143,7 @@ mod routes {
             .and(with_storage(storage))
             .and(warp::path::param::<String>())
             .and(warp::path::param::<String>())
+            .and(warp::path::end())
             .map(|storage: DB, collection: String, id: String| {
                 let col = storage.read().get(&collection);
                 let mut n = None;
@@ -164,6 +165,7 @@ mod routes {
     pub fn list(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::get()
             .and(with_storage(storage))
+            .and(warp::path::end())
             .map(|storage: DB| {
                 warp::reply::json(&storage.read().list())
             })
@@ -173,8 +175,24 @@ mod routes {
         warp::delete()
             .and(with_storage(storage))
             .and(warp::path::param::<String>())
+            .and(warp::path::end())
             .map(|storage: DB, collection: String| {
                 storage.write().remove(collection);
+                "OK"
+            })
+    }
+
+    pub fn remove_by_id(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::delete()
+            .and(with_storage(storage))
+            .and(warp::path::param::<String>())
+            .and(warp::path::param::<String>())
+            .and(warp::path::end())
+            .map(|storage: DB, collection: String, id: String| {
+                let col = storage.read().get(&collection);
+                if let Some(col) = col {
+                    col.write().remove(id);
+                }
                 "OK"
             })
     }

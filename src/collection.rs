@@ -21,6 +21,13 @@ struct IndexItem {
     geom: Geometry<f64>,
 }
 
+impl PartialEq for IndexItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+    
+}
+
 impl SpatialObject for IndexItem {
     type Point = [f64; 2];
 
@@ -143,6 +150,50 @@ impl Collection {
 
     pub fn get(&self, key: &String) -> Option<String> {
         self.objects.get(key).map(|s| s.clone())
+    }
+
+    pub fn remove(&mut self, id: String) {
+        let t = self.objects.remove(&id);
+        if let None = t {
+            return;
+        }
+        let collection: GeometryCollection<f64> = quick_collection(&GeoJson::from_str(&t.unwrap()).unwrap()).unwrap();
+        collection.into_iter().for_each(|geom| {
+            match geom {
+                Geometry::LineString(p) => {
+                    p.lines().into_iter().for_each(|sub_geom| {
+                        self.idx.remove(&IndexItem {
+                            id: id.clone(),
+                            geom: Geometry::Line(sub_geom),
+                        });
+                    });
+                },
+                Geometry::MultiLineString(p) => {
+                    p.into_iter().for_each(|line_string| {
+                        line_string.lines().into_iter().for_each(|sub_geom| {
+                            self.idx.remove(&IndexItem {
+                                id: id.clone(),
+                                geom: Geometry::Line(sub_geom),
+                            });
+                        });
+                    });
+                },
+                Geometry::MultiPolygon(p) => {
+                    p.into_iter().for_each(|poly| {
+                        self.idx.remove(&IndexItem {
+                            id: id.clone(),
+                            geom: Geometry::Polygon(poly),
+                        });
+                    });
+                },
+                _ => {
+                    self.idx.remove(&IndexItem {
+                        id: id.clone(),
+                        geom,
+                    });
+                },
+            }
+        });
     }
 
     pub fn add(&mut self, id: String, geojson: GeoJson) -> bool {
