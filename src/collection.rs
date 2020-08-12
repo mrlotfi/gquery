@@ -154,6 +154,9 @@ impl Collection {
 
     pub fn remove(&mut self, id: String) {
         let t = self.objects.remove(&id);
+        if let None = t {
+            return;
+        }
         let collection: GeometryCollection<f64> = quick_collection(&GeoJson::from_str(&t.unwrap()).unwrap()).unwrap();
         collection.into_iter().for_each(|geom| {
             match geom {
