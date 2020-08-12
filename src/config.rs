@@ -25,7 +25,7 @@ pub struct Config {
         short,
         long,
         name = "interval between saved snapshots in seconds",
-        default_value = "3600"
+        default_value = "2592000"
     )]
     pub save_interval: u64,
 }
