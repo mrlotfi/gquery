@@ -1,6 +1,6 @@
-use structopt::StructOpt;
-use std::path::PathBuf;
 use std::net::IpAddr;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 pub static WELCOME_MESSAGE: &str = r#" ██████╗  ██████╗ ██╗   ██╗███████╗██████╗ ██╗   ██╗
 ██╔════╝ ██╔═══██╗██║   ██║██╔════╝██╔══██╗╚██╗ ██╔╝
@@ -12,16 +12,21 @@ pub static WELCOME_MESSAGE: &str = r#" ██████╗  ██████
 #[derive(StructOpt, Debug)]
 #[structopt(name = "config")]
 pub struct Config {
-    #[structopt(short, long, default_value="6985", env = "PORT")]
+    #[structopt(short, long, default_value = "6985", env = "PORT")]
     pub port: u16,
 
-    #[structopt(short, long, default_value="127.0.0.1", parse(try_from_str))]
+    #[structopt(short, long, default_value = "127.0.0.1", parse(try_from_str))]
     pub host: IpAddr,
 
-    #[structopt(short, long, default_value="./data.bin", parse(from_os_str))]
+    #[structopt(short, long, default_value = "./data.bin", parse(from_os_str))]
     pub data: PathBuf,
 
-    #[structopt(short, long, name="interval between saved snapshots in seconds", default_value="3600")]
+    #[structopt(
+        short,
+        long,
+        name = "interval between saved snapshots in seconds",
+        default_value = "3600"
+    )]
     pub save_interval: u64,
 }
 

@@ -1,13 +1,13 @@
-use serde::{Serialize, Deserialize};
 use geojson::GeoJson;
+use serde::{Deserialize, Serialize};
 
 use crate::collection::Storage;
 use crate::config::{get_conf, WELCOME_MESSAGE};
 use colored::*;
-use std::sync::Arc;
 use parking_lot::RwLock;
-use warp::http::Response;
+use std::sync::Arc;
 use tokio::time::{interval, Duration};
+use warp::http::Response;
 
 fn backup(storage: Arc<RwLock<Storage>>) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -22,7 +22,6 @@ fn backup(storage: Arc<RwLock<Storage>>) -> tokio::task::JoinHandle<()> {
 
 type DB = Arc<RwLock<Storage>>;
 
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct IndexRequestItem {
     id: Option<String>,
@@ -32,7 +31,7 @@ struct IndexRequestItem {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct SearchPoint {
     long: f64,
-    lat: f64
+    lat: f64,
 }
 
 mod routes {
@@ -70,8 +69,7 @@ mod routes {
                 if let Some(col) = col {
                     col.write().add(id.clone(), body.geojson);
                 } else {
-                    storage.write().create(collection)
-                        .write().add(id.clone(), body.geojson);
+                    storage.write().create(collection).write().add(id.clone(), body.geojson);
                 }
 
                 id
@@ -95,9 +93,7 @@ mod routes {
                         .header("Content-Type", "application/json")
                         .body(format!("{{\"id\": \"{}\", \"geojson\": {}}}", n.0, n.1))
                 } else {
-                    Response::builder()
-                        .status(404)
-                        .body("not found".to_owned())
+                    Response::builder().status(404).body("not found".to_owned())
                 }
             })
     }
@@ -119,9 +115,7 @@ mod routes {
                         .header("Content-Type", "application/json")
                         .body(format!("{{\"id\": \"{}\", \"geojson\": {}}}", n.0, n.1))
                 } else {
-                    Response::builder()
-                        .status(404)
-                        .body("not found".to_owned())
+                    Response::builder().status(404).body("not found".to_owned())
                 }
             })
     }
@@ -132,9 +126,7 @@ mod routes {
             .and(warp::path("save"))
             .map(|storage: DB| {
                 storage.read().save_to_file();
-                Response::builder()
-                    .status(200)
-                    .body("OK".to_owned())
+                Response::builder().status(200).body("OK".to_owned())
             })
     }
 
@@ -155,9 +147,7 @@ mod routes {
                         .header("Content-Type", "application/json")
                         .body(format!("{{\"id\": \"{}\", \"geojson\": {}}}", id, n))
                 } else {
-                    Response::builder()
-                        .status(404)
-                        .body("not found".to_owned())
+                    Response::builder().status(404).body("not found".to_owned())
                 }
             })
     }
@@ -166,9 +156,7 @@ mod routes {
         warp::get()
             .and(with_storage(storage))
             .and(warp::path::end())
-            .map(|storage: DB| {
-                warp::reply::json(&storage.read().list())
-            })
+            .map(|storage: DB| warp::reply::json(&storage.read().list()))
     }
 
     pub fn drop(storage: DB) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -203,7 +191,8 @@ pub async fn serve() {
     let s = match Storage::load_from_file() {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("{}",
+            eprintln!(
+                "{}",
                 format!("Unable to load data file: {}. Creating an empty server", e.to_string()).yellow()
             );
             Storage::new()

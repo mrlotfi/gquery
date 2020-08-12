@@ -1,20 +1,19 @@
-use std::collections::HashMap;
-use geo_types::{GeometryCollection,Geometry, Point, LineString};
-use spade::rtree::RTree;
-use spade::{SpatialObject, BoundingRect};
-use serde::{Serialize, Deserialize};
-use geo::prelude::*;
+use crate::config::get_conf;
 use geo::algorithm::bounding_rect::BoundingRect as br;
-use geojson::{GeoJson, quick_collection};
-use std::sync::Arc;
+use geo::prelude::*;
+use geo_types::{Geometry, GeometryCollection, LineString, Point};
+use geojson::{quick_collection, GeoJson};
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use spade::rtree::RTree;
+use spade::{BoundingRect, SpatialObject};
+use std::collections::HashMap;
+use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Instant;
-use crate::config::get_conf;
-use std::error::Error;
-
 
 struct IndexItem {
     id: String,
@@ -25,7 +24,6 @@ impl PartialEq for IndexItem {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
-    
 }
 
 impl SpatialObject for IndexItem {
@@ -33,23 +31,14 @@ impl SpatialObject for IndexItem {
 
     fn mbr(&self) -> BoundingRect<Self::Point> {
         let rect = self.geom.bounding_rect().unwrap();
-        BoundingRect::from_corners(
-            &[rect.min().x, rect.min().y],
-            &[rect.max().x, rect.max().y],
-        )
+        BoundingRect::from_corners(&[rect.min().x, rect.min().y], &[rect.max().x, rect.max().y])
     }
 
     fn distance2(&self, point: &Self::Point) -> f64 {
         match &self.geom {
-            Geometry::Point(p) => {
-                p.euclidean_distance(&Point::new(point[0], point[1]))
-            },
-            Geometry::Polygon(p) => {
-                p.euclidean_distance(&Point::new(point[0], point[1]))
-            },
-            Geometry::Line(p) => {
-                p.euclidean_distance(&Point::new(point[0], point[1]))
-            },
+            Geometry::Point(p) => p.euclidean_distance(&Point::new(point[0], point[1])),
+            Geometry::Polygon(p) => p.euclidean_distance(&Point::new(point[0], point[1])),
+            Geometry::Line(p) => p.euclidean_distance(&Point::new(point[0], point[1])),
             _ => panic!("Shouldnt reach here"),
         }
     }
@@ -59,17 +48,14 @@ impl SpatialObject for IndexItem {
     }
 }
 
-
 pub struct Storage {
     collections: HashMap<String, Arc<RwLock<Collection>>>,
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 struct Saved {
-    items: HashMap<String, HashMap<String, String>>
+    items: HashMap<String, HashMap<String, String>>,
 }
-
 
 impl Storage {
     pub fn new() -> Self {
@@ -81,19 +67,25 @@ impl Storage {
     pub fn save_to_file(&self) {
         let start = Instant::now();
         let file_path = get_conf().data;
-        let mut saved = Saved {
-            items: HashMap::new()
-        };
+        let mut saved = Saved { items: HashMap::new() };
         let mut n: usize = 0;
         for (col, val) in &self.collections {
             saved.items.insert(col.clone(), HashMap::new());
             for (key, geojson_str) in &val.read().objects {
-                saved.items.get_mut(col).unwrap().insert(key.clone(), geojson_str.clone());
+                saved
+                    .items
+                    .get_mut(col)
+                    .unwrap()
+                    .insert(key.clone(), geojson_str.clone());
                 n += 1;
             }
         }
         bincode::serialize_into(&File::create(file_path).unwrap(), &saved).unwrap();
-        println!("Saved {} items from current db in {:.2} seconds", n, start.elapsed().as_secs_f32());
+        println!(
+            "Saved {} items from current db in {:.2} seconds",
+            n,
+            start.elapsed().as_secs_f32()
+        );
     }
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
@@ -110,18 +102,21 @@ impl Storage {
             n += collection.objects.len();
             s.collections.insert(col, Arc::new(RwLock::new(collection)));
         }
-        println!("Loaded {} items from saved db in {:.2} seconds", n, start.elapsed().as_secs_f32());
+        println!(
+            "Loaded {} items from saved db in {:.2} seconds",
+            n,
+            start.elapsed().as_secs_f32()
+        );
         Ok(s)
     }
 
     pub fn get(&self, key: &str) -> Option<Arc<RwLock<Collection>>> {
-        self.collections.get(key).map(|arc| {
-            Arc::clone(arc)
-        })
+        self.collections.get(key).map(|arc| Arc::clone(arc))
     }
 
     pub fn create(&mut self, key: String) -> Arc<RwLock<Collection>> {
-        self.collections.insert(key.clone(), Arc::new(RwLock::new(Collection::new())));
+        self.collections
+            .insert(key.clone(), Arc::new(RwLock::new(Collection::new())));
         Arc::clone(&self.collections[&key])
     }
 
@@ -134,7 +129,6 @@ impl Storage {
     }
 }
 
-
 pub struct Collection {
     idx: RTree<IndexItem>,
     objects: HashMap<String, String>,
@@ -144,7 +138,7 @@ impl Collection {
     pub fn new() -> Self {
         Self {
             idx: RTree::new(),
-            objects: HashMap::new()
+            objects: HashMap::new(),
         }
     }
 
@@ -158,71 +152,59 @@ impl Collection {
             return;
         }
         let collection: GeometryCollection<f64> = quick_collection(&GeoJson::from_str(&t.unwrap()).unwrap()).unwrap();
-        collection.into_iter().for_each(|geom| {
-            match geom {
-                Geometry::LineString(p) => {
-                    p.lines().for_each(|sub_geom| {
+        collection.into_iter().for_each(|geom| match geom {
+            Geometry::LineString(p) => {
+                p.lines().for_each(|sub_geom| {
+                    self.idx.remove(&IndexItem {
+                        id: id.clone(),
+                        geom: Geometry::Line(sub_geom),
+                    });
+                });
+            }
+            Geometry::MultiLineString(p) => {
+                p.into_iter().for_each(|line_string| {
+                    line_string.lines().for_each(|sub_geom| {
                         self.idx.remove(&IndexItem {
                             id: id.clone(),
                             geom: Geometry::Line(sub_geom),
                         });
                     });
-                },
-                Geometry::MultiLineString(p) => {
-                    p.into_iter().for_each(|line_string| {
-                        line_string.lines().for_each(|sub_geom| {
-                            self.idx.remove(&IndexItem {
-                                id: id.clone(),
-                                geom: Geometry::Line(sub_geom),
-                            });
-                        });
-                    });
-                },
-                Geometry::MultiPolygon(p) => {
-                    p.into_iter().for_each(|poly| {
-                        self.idx.remove(&IndexItem {
-                            id: id.clone(),
-                            geom: Geometry::Polygon(poly),
-                        });
-                    });
-                },
-                _ => {
+                });
+            }
+            Geometry::MultiPolygon(p) => {
+                p.into_iter().for_each(|poly| {
                     self.idx.remove(&IndexItem {
                         id: id.clone(),
-                        geom,
+                        geom: Geometry::Polygon(poly),
                     });
-                },
+                });
+            }
+            _ => {
+                self.idx.remove(&IndexItem { id: id.clone(), geom });
             }
         });
     }
 
     pub fn add(&mut self, id: String, geojson: GeoJson) -> bool {
         let collection: GeometryCollection<f64> = quick_collection(&geojson).unwrap();
-        collection.into_iter().for_each(|geom| {
-            match geom {
-                Geometry::LineString(p) => {
-                    self.index_linestring(&id, p);
-                },
-                Geometry::MultiLineString(p) => {
-                    p.into_iter().for_each(|line_string| {
-                        self.index_linestring(&id, line_string);
-                    });
-                },
-                Geometry::MultiPolygon(p) => {
-                    p.into_iter().for_each(|poly| {
-                        self.idx.insert(IndexItem {
-                            id: id.clone(),
-                            geom: Geometry::Polygon(poly),
-                        })
-                    });
-                },
-                _ => {
+        collection.into_iter().for_each(|geom| match geom {
+            Geometry::LineString(p) => {
+                self.index_linestring(&id, p);
+            }
+            Geometry::MultiLineString(p) => {
+                p.into_iter().for_each(|line_string| {
+                    self.index_linestring(&id, line_string);
+                });
+            }
+            Geometry::MultiPolygon(p) => {
+                p.into_iter().for_each(|poly| {
                     self.idx.insert(IndexItem {
                         id: id.clone(),
-                        geom,
+                        geom: Geometry::Polygon(poly),
                     })
-                },
+                });
             }
+            _ => self.idx.insert(IndexItem { id: id.clone(), geom }),
         });
         self.objects.insert(id, geojson.to_string());
         true
@@ -240,9 +222,7 @@ impl Collection {
     pub fn nearest(&self, long: f64, lat: f64) -> Option<(String, String)> {
         self.idx
             .nearest_neighbor(&[long, lat])
-            .map(|n| {
-                (n.id.clone(), self.objects.get(&n.id).unwrap().clone())
-            })
+            .map(|n| (n.id.clone(), self.objects.get(&n.id).unwrap().clone()))
     }
 
     pub fn intersect(&self, long: f64, lat: f64) -> Option<(String, String)> {
@@ -257,9 +237,9 @@ impl Collection {
 }
 
 #[cfg(test)]
-mod test{
+mod test {
     use super::*;
-    use geo::{point, line_string, Geometry, polygon};
+    use geo::{line_string, point, polygon, Geometry};
     #[test]
     fn test_add() {
         let p = polygon![
