@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use geojson::GeoJson;
-use nanoid;
+
 use crate::collection::Storage;
 use crate::config::{get_conf, WELCOME_MESSAGE};
 use colored::*;
@@ -10,14 +10,14 @@ use warp::http::Response;
 use tokio::time::{interval, Duration};
 
 fn backup(storage: Arc<RwLock<Storage>>) -> tokio::task::JoinHandle<()> {
-    return tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut interval = interval(Duration::from_secs(get_conf().save_interval));
         interval.tick().await;
         loop {
             interval.tick().await;
             storage.read().save_to_file();
         }
-    });
+    })
 }
 
 type DB = Arc<RwLock<Storage>>;
@@ -74,7 +74,7 @@ mod routes {
                         .write().add(id.clone(), body.geojson);
                 }
 
-                return id;
+                id
             })
     }
 
@@ -97,7 +97,7 @@ mod routes {
                 } else {
                     Response::builder()
                         .status(404)
-                        .body(format!("not found"))
+                        .body("not found".to_owned())
                 }
             })
     }
@@ -121,7 +121,7 @@ mod routes {
                 } else {
                     Response::builder()
                         .status(404)
-                        .body(format!("not found"))
+                        .body("not found".to_owned())
                 }
             })
     }
@@ -134,7 +134,7 @@ mod routes {
                 storage.read().save_to_file();
                 Response::builder()
                     .status(200)
-                    .body(format!("OK"))
+                    .body("OK".to_owned())
             })
     }
 
@@ -157,7 +157,7 @@ mod routes {
                 } else {
                     Response::builder()
                         .status(404)
-                        .body(format!("not found"))
+                        .body("not found".to_owned())
                 }
             })
     }

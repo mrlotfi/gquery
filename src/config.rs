@@ -28,7 +28,7 @@ pub struct Config {
 pub fn get_conf() -> Config {
     let mut conf = None;
     let get_conf = || {
-        if let None = conf {
+        if conf.is_none() {
             conf = Some(Config::from_args())
         }
         conf.unwrap()

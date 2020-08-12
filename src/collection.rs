@@ -114,7 +114,7 @@ impl Storage {
         Ok(s)
     }
 
-    pub fn get(&self, key: &String) -> Option<Arc<RwLock<Collection>>> {
+    pub fn get(&self, key: &str) -> Option<Arc<RwLock<Collection>>> {
         self.collections.get(key).map(|arc| {
             Arc::clone(arc)
         })
@@ -122,7 +122,7 @@ impl Storage {
 
     pub fn create(&mut self, key: String) -> Arc<RwLock<Collection>> {
         self.collections.insert(key.clone(), Arc::new(RwLock::new(Collection::new())));
-        return Arc::clone(&self.collections[&key]);
+        Arc::clone(&self.collections[&key])
     }
 
     pub fn remove(&mut self, key: String) {
@@ -130,7 +130,7 @@ impl Storage {
     }
 
     pub fn list(&self) -> Vec<&String> {
-        self.collections.keys().into_iter().collect()
+        self.collections.keys().collect()
     }
 }
 
@@ -148,20 +148,20 @@ impl Collection {
         }
     }
 
-    pub fn get(&self, key: &String) -> Option<String> {
-        self.objects.get(key).map(|s| s.clone())
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.objects.get(key).cloned()
     }
 
     pub fn remove(&mut self, id: String) {
         let t = self.objects.remove(&id);
-        if let None = t {
+        if t.is_none() {
             return;
         }
         let collection: GeometryCollection<f64> = quick_collection(&GeoJson::from_str(&t.unwrap()).unwrap()).unwrap();
         collection.into_iter().for_each(|geom| {
             match geom {
                 Geometry::LineString(p) => {
-                    p.lines().into_iter().for_each(|sub_geom| {
+                    p.lines().for_each(|sub_geom| {
                         self.idx.remove(&IndexItem {
                             id: id.clone(),
                             geom: Geometry::Line(sub_geom),
@@ -170,7 +170,7 @@ impl Collection {
                 },
                 Geometry::MultiLineString(p) => {
                     p.into_iter().for_each(|line_string| {
-                        line_string.lines().into_iter().for_each(|sub_geom| {
+                        line_string.lines().for_each(|sub_geom| {
                             self.idx.remove(&IndexItem {
                                 id: id.clone(),
                                 geom: Geometry::Line(sub_geom),
@@ -228,21 +228,21 @@ impl Collection {
         true
     }
 
-    fn index_linestring(&mut self, id: &String, p: LineString<f64>) {
-        p.lines().into_iter().for_each(|sub_geom| {
+    fn index_linestring(&mut self, id: &str, p: LineString<f64>) {
+        p.lines().for_each(|sub_geom| {
             self.idx.insert(IndexItem {
-                id: id.clone(),
+                id: id.to_owned(),
                 geom: Geometry::Line(sub_geom),
             })
         });
     }
 
     pub fn nearest(&self, long: f64, lat: f64) -> Option<(String, String)> {
-        return self.idx
+        self.idx
             .nearest_neighbor(&[long, lat])
             .map(|n| {
                 (n.id.clone(), self.objects.get(&n.id).unwrap().clone())
-            });
+            })
     }
 
     pub fn intersect(&self, long: f64, lat: f64) -> Option<(String, String)> {
